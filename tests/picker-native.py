@@ -643,6 +643,8 @@ def test_sorting():
     sorting.click("Back")
     sorting.until("leaving Recent restores the chosen order", lambda state: state["path"] == str(ordered) and names(state) == by_modified)
     check("SP11 ui.json is byte for byte what the window saved", state_file.read_text() == saved, state_file.read_text())
+    # The two requests below start from name, the order a box with nothing saved opens in.
+    guard(state_file).unlink()
     sorting.row("alpha.txt")
     sorting.key("-k", "Return")
     sorting.answered(0, [(ordered / "bravo.txt").as_uri()])
@@ -672,7 +674,6 @@ def test_sorting():
     check("SP13 typing in Filename sorts nothing", typed["sortBy"] == "size" and not typed["sortDesc"], typed)
     saving.cancel()
     guard(ordered / "report.txt").unlink()
-    guard(state_file).unlink()
 
 
 def main():

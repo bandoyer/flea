@@ -142,11 +142,10 @@ ShellRoot {
         // The header's click and the s and S keys, by way of ui/js/Sort.js. The backend reorders the
         // listing it holds, already narrowed to the caller's filter, so the folder is not read again
         // and neither the marks nor a save review move: the folder did not change. The choice is this
-        // dialog's own, held across refreshes by preserveSort and never written to ui.json.
+        // dialog's own, held across refreshes by the backend's preserveSort and never written to ui.json.
         function requestSort(order) {
             if (!order || !win.sortable || (backend.sortBy === order.key && backend.sortDesc === order.desc))
                 return
-            backend.preserveSort = true
             backend.sortBy = order.key
             backend.sortDesc = order.desc
             win.clearListing()
@@ -339,6 +338,8 @@ ShellRoot {
 
         Flea.Backend {
             id: backend
+            // The saved order seeds the first listing only: a window re-sorting later would move the mark over rows that never moved.
+            preserveSort: true
 
             onListed: function (n, readMs, sortMs) {
                 if (win.backendUnavailable) return
@@ -373,9 +374,9 @@ ShellRoot {
                 if (where === "scan" || where === "sort") {
                     win.pendingListings = Math.max(0, win.pendingListings - 1)
                     if (win.pendingListings > 0) return
+                    win.listingFailed = true
                 }
                 win.listingState = "empty"
-                win.listingFailed = true
                 win.say(msg, true)
             }
             onChanged: function (path) {
