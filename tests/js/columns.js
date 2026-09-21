@@ -134,6 +134,24 @@ function runPicker(check) {
             everDrawn = true
     }
     check("no width at all draws Mode or Kind in the chooser", everDrawn, false)
+
+    // Where the chooser's two metadata columns go, walked from the anchor chain above rather than
+    // read back from ui/js/Columns.js. A hidden column still nests inside the floors below it, so
+    // Mode's 70 is inside Size's floor and Size's inside Modified's even though Mode never draws:
+    //   name's own slot      14 + 23 + 9 + 156 + 14 = 216
+    //   + mode 70 + gap 9                          = 295
+    //   + size 70 + gap 9                          = 374   Size draws at or above this
+    //   + date 80 + gap 9                          = 463   Modified draws at or above this
+    // ui/PickerHeader.qml heads exactly what the rows draw, so below these the pointer route is
+    // gone and the s and S keys are the only way to sort.
+    check("Modified draws down to its floor and not one pixel below",
+          Columns.names(Columns.set(463, PICKER, Picker.HIDDEN_COLS)) + " | "
+          + Columns.names(Columns.set(462, PICKER, Picker.HIDDEN_COLS)), "name,size,date | name,size")
+    check("Size draws down to its own floor and not one pixel below",
+          Columns.names(Columns.set(374, PICKER, Picker.HIDDEN_COLS)) + " | "
+          + Columns.names(Columns.set(373, PICKER, Picker.HIDDEN_COLS)), "name,size | name")
+    check("a chooser too narrow for either still heads the name it exists for",
+          Columns.names(Columns.set(200, PICKER, Picker.HIDDEN_COLS)), "name")
 }
 
 // The user's own hidden set, subtracted from what the width affords: a hidden column never draws,
