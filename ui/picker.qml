@@ -38,6 +38,13 @@ ShellRoot {
         property var kindNames: []
         property int cursorIndex: 0
         property string listingState: "loading"
+        // A refused scan leaves the backend holding the folder before this one, and "empty" alone
+        // cannot say so: a sort then would draw that folder's rows under this path, and marks are
+        // built from the path. Only a new listing clears it.
+        property bool listingFailed: false
+        // The one statement of when the listing may be reordered; the header and the keys both read it.
+        readonly property bool sortable: !win.backendUnavailable && !win.recent && !win.submitting && !win.listingFailed
+            && win.listingState !== "loading" && !(shares.item && shares.item.active)
         property int pendingListings: 0
         property bool receivingLatestListing: false
         property bool backendUnavailable: false
@@ -110,12 +117,8 @@ ShellRoot {
             if (win.backendUnavailable) return
             if (shares.item) shares.item.close()
             win.path = next
-            win.total = 0
-            win.held = 0
-            win.rows = []
-            win.cursorIndex = 0
-            win.listingState = "loading"
-            win.receivingLatestListing = false
+            win.listingFailed = false
+            win.clearListing()
             win.invalidateSave()
             win.validateMarks(false)
             if (Picker.isRecent(next)) {
@@ -123,6 +126,35 @@ ShellRoot {
                 return
             }
             win.requestListing(backend.listRequest(next, win.windowSize, list.showHidden))
+        }
+
+        // Rows are named by index, so a listing about to be replaced or reordered is dropped whole.
+        // An emptied model also puts the viewport back at the top, which StopAtBounds guarantees.
+        function clearListing() {
+            win.total = 0
+            win.held = 0
+            win.rows = []
+            win.cursorIndex = 0
+            win.listingState = "loading"
+            win.receivingLatestListing = false
+        }
+
+        // The header's click and the s and S keys, by way of ui/js/Sort.js. The backend reorders the
+        // listing it holds, already narrowed to the caller's filter, so the folder is not read again
+        // and neither the marks nor a save review move: the folder did not change. The choice is this
+        // dialog's own, held across refreshes by preserveSort and never written to ui.json.
+        function requestSort(order) {
+            if (!order || !win.sortable || (backend.sortBy === order.key && backend.sortDesc === order.desc))
+                return
+            backend.preserveSort = true
+            backend.sortBy = order.key
+            backend.sortDesc = order.desc
+            win.clearListing()
+            win.pendingListings++
+            backend.sort(order.key, order.desc)
+            // sort emits no rows of its own, so the reordered window is asked for; see docs/protocol.md.
+            backend.window(0, win.windowSize)
+            list.forceActiveFocus()
         }
 
         function requestListing(request) {
@@ -343,6 +375,7 @@ ShellRoot {
                     if (win.pendingListings > 0) return
                 }
                 win.listingState = "empty"
+                win.listingFailed = true
                 win.say(msg, true)
             }
             onChanged: function (path) {
@@ -421,11 +454,21 @@ ShellRoot {
                 }
             }
 
+            Flea.PickerHeader {
+                id: header
+                anchors.left: places.right
+                anchors.right: parent.right
+                anchors.top: chrome.bottom
+                picker: win
+                backend: backend
+                leadingSlot: list.checkSize + Theme.spacing.gap
+            }
+
             Flea.PickerList {
                 id: list
                 anchors.left: places.right
                 anchors.right: parent.right
-                anchors.top: chrome.bottom
+                anchors.top: header.bottom
                 anchors.bottom: save.top
                 picker: win
                 backend: backend
@@ -478,7 +521,7 @@ ShellRoot {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: status.top
-                maximumHeight: Math.max(0, status.y - chrome.height - Theme.rowHeight)
+                maximumHeight: Math.max(0, status.y - chrome.height - header.height - Theme.rowHeight)
                 picker: win
                 onNameEdited: function (text) { win.saveName = text }
                 onAccepted: win.accept()
@@ -545,20 +588,20 @@ ShellRoot {
             function message(): string { return win.message }
             function checks(): string { return JSON.stringify({marksBusy: win.markRequest > 0, saveBusy: win.saveRequest > 0, submitting: win.submitting, canAccept: win.canAccept, saveReady: win.saveReady, collision: win.saveCollision, review: win.saveReview.review || 0}) }
             function markedUris(): string { return JSON.stringify(win.marks.map(function(mark) { return mark.uri })) }
-            function controls(): string { return JSON.stringify(chrome.controls().concat(save.controls(), places.controls())) }
+            function controls(): string { return JSON.stringify(chrome.controls().concat(header.controls(), save.controls(), places.controls())) }
             function rowCentre(index: int): string { return win.centre(list.itemAtIndex(index)) }
             function saveState(): string { return JSON.stringify({name: win.saveName, path: win.saveReview.path || "", collision: win.saveCollision, error: win.saveError, field: win.centre(save.fieldItem)}) }
             function snapshot(): string {
                 return JSON.stringify({path: win.path, total: win.total, held: win.held, rows: win.rows,
                     cursor: win.cursorIndex, cursorName: win.rowFor(win.cursorIndex) ? win.rowFor(win.cursorIndex).n : "",
-                    marks: win.marks, state: win.listingState, filter: win.filterIndex, history: win.history,
+                    marks: win.marks, state: win.listingState, listingFailed: win.listingFailed, sortBy: backend.sortBy, sortDesc: backend.sortDesc, sortable: win.sortable, filter: win.filterIndex, history: win.history,
                     marksBusy: win.markRequest > 0, saveBusy: win.saveRequest > 0, submitting: win.submitting, backendUnavailable: win.backendUnavailable,
                     canAccept: win.canAccept, saveReady: win.saveReady, collision: win.saveCollision,
                     saveName: win.saveName, saveError: win.saveError, message: win.message, messageError: win.messageError, hints: status.hints,
-                    controls: chrome.controls().concat(save.controls(), places.controls()), listFocus: list.activeFocus,
+                    controls: chrome.controls().concat(header.controls(), save.controls(), places.controls()), listFocus: list.activeFocus,
                     railFocus: places.focusItem.activeFocus, preset: Flea.ViewState.keysPreset,
                     bodySmall: Theme.font.bodySmall, body: Theme.font.body, width: win.width, height: win.height,
-                    geometry: {chrome: chrome.height, rail: places.width, row: Theme.rowHeight, footer: status.height,
+                    geometry: {chrome: chrome.height, header: header.height, rail: places.width, row: Theme.rowHeight, footer: status.height,
                         save: save.height, list: list.height, saveViewport: win.bounds(save.scrollItem), saveScroll: save.scrollItem.contentY},
                     outputUri: {text: save.uri, offset: save.uriItem.contentX,
                         maximum: Math.max(0, save.uriItem.contentWidth - save.uriItem.width)}, title: win.title, app: win.req.app})

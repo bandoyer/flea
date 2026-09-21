@@ -255,6 +255,13 @@ what is marked, Backspace climbs, Escape refuses. `.` shows and hides the direct
 same re-read the window makes; a preset's toggleHidden chord does the same. Nothing marked and Enter
 does nothing, because a chooser that sends on a stray keypress is worse than one that asks twice.
 
+The list carries the window's column header over Name, Size and Modified. A click on a column sorts
+by it ascending and a second click reverses it; `s` steps through the three and `S` reverses
+whichever order the list is in. The chooser opens in the order the window last saved, and what you
+choose here stays with this dialog: it holds through filter chips, the hidden toggle and outside
+changes to the folder, nothing is written to `ui.json`, and what is checked stays checked. Recent is
+the desktop's own order and cannot be sorted.
+
 ### Undo
 
 ```

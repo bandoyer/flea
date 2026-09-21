@@ -800,6 +800,24 @@ gets the same chooser.
   `ui/PickerList.qml` hands `Row` `Picker.HIDDEN_COLS` and the chooser never inherits Mode or Kind
   from `ViewState`, whatever the header menu has switched on for the browser window.
 
+**The chooser sorts through the window's own `sort` command, and never by reading the folder again.**
+`ui/PickerHeader.qml` is `ui/Header.qml` over the chooser's columns, the `s` and `S` keys are the
+`listing` context's own bindings, and all three ask `ui/js/Sort.js` for the order: `columnOrder`,
+`nextOrder` and `reverseOrder` are the decision, shared with the pane, and `Picker.SORT_ORDERS` is
+the narrower list the chooser offers, because Kind is hidden and an order no header can mark has no
+feedback. A saved kind order is still inherited and `S` still reverses it. `requestSort` in
+`ui/picker.qml` is the one way in. `filter_listing` runs before ordering in `src/backend/run.rs`, so
+the listing `sort` reorders is already narrowed to the caller's filter, and because the folder is not
+re-read neither the marks nor a save review are touched. The choice sets `preserveSort`, so it rides
+every later `list`, and it is never written to `ui.json`. **`win.sortable` is the one statement of
+when a sort may be asked for, and `listingFailed` is the clause that matters:** a refused scan leaves
+the backend holding the folder before it, by design, while the chooser's path has already moved and
+its state reads `empty`. A `sort` there was MEASURED drawing the previous folder's rows under the
+refused path, with the clause removed, and `Picker.rowPath` builds marks and returned URIs from that
+path. Recent is excluded for the same family of reason: `sort` reorders whatever listing the backend
+holds, and `listpaths` is never sorted. `ui/PickerFooter.qml` exists because the header needed room
+under `ui/picker.qml`'s recorded ceiling and the footer was the one block that only reads the picker.
+
 **Recent, and why it is read-only.** `SendPicker.html` draws a Recent row above Home in the rail,
 says the location's own name where the path would be, and draws Parent disabled with the words
 "unavailable in Recent". The history it lists is the desktop's own,
