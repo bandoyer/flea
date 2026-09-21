@@ -133,6 +133,16 @@ function run(check) {
     check("S reverses an inherited kind rather than refusing it",
           JSON.stringify(Sort.flipped("kind", false)), '{"key":"kind","desc":true}')
 
+    // ...but only for an order the backend will really produce. ui.json is merged into the window's
+    // state without this build validating the key, so a hand-edited or foreign state file can leave
+    // a key here that no sort answers. ui/PickerList.qml refuses to spend the listing on one.
+    check("kind is an order the backend produces, so S may reverse it", Sort.supported("kind"), true)
+    check("and so are the three the chooser heads",
+          [Sort.supported("name"), Sort.supported("size"), Sort.supported("mtime")].join(","), "true,true,true")
+    check("a key no sort answers is refused before the listing is spent", Sort.supported("nonsense"), false)
+    // date is ui.json's spelling; Backend.resetSort normalizes it to mtime before it ever gets here.
+    check("and so is ui.json's own date, which is normalized long before this", Sort.supported("date"), false)
+
     check("a pick answers with its URIs", Picker.reply(0, ["/home/gm/a.txt"]),
           '{"response":0,"uris":["file:///home/gm/a.txt"]}')
     check("a refusal answers with no URI at all", Picker.reply(1, ["/home/gm/a.txt"]), '{"response":1}')

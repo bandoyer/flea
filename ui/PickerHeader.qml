@@ -15,8 +15,11 @@ Item {
 
     implicitHeight: header.implicitHeight
     // Sorting is the one thing this strip does, so it goes down whole where there is nothing to
-    // sort: a history in its own order, a submission under way, or no backend to ask.
+    // sort: a history in its own order, a submission under way, no backend to ask, or a listing
+    // still in flight. That last one is picker.requestSort's own guard, and the strip has to report
+    // it or a click during a size pass would be dropped by a control still drawn as live.
     enabled: !root.picker.recent && !root.picker.submitting && !root.picker.backendUnavailable
+        && root.picker.listingState !== "loading"
 
     Flea.Header {
         id: header

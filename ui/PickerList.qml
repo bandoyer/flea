@@ -146,7 +146,13 @@ ListView {
         root.sortTo(Sort.clicked(Picker.SORT_ORDERS, root.backend.sortBy, root.backend.sortDesc, key))
     }
     function sortStep() { root.sortTo(Sort.stepped(Picker.SORT_ORDERS, root.backend.sortBy)) }
-    function sortFlip() { root.sortTo(Sort.flipped(root.backend.sortBy, root.backend.sortDesc)) }
+    function sortFlip() {
+        // A key ui.json carries that this build does not know cannot be reversed into anything, and
+        // asking would spend the listing on a refusal; the order on screen is left where it is.
+        if (!Sort.supported(root.backend.sortBy))
+            return
+        root.sortTo(Sort.flipped(root.backend.sortBy, root.backend.sortDesc))
+    }
     function sortTo(decision) {
         if (decision)
             root.picker.requestSort(decision.key, decision.desc)

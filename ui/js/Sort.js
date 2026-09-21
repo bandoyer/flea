@@ -36,6 +36,13 @@ function stepped(orders, by) {
     return {key: orders[(orders.indexOf(by) + 1) % orders.length], desc: false}
 }
 
+// Whether the backend will really produce an order, which is what may move a recorded one. The
+// window sends a refused key anyway and lets the error line answer for it; a chooser cannot, since
+// tearing its listing down for a refusal it can do nothing with would leave the dialog blank.
+function supported(key) {
+    return ORDERS.indexOf(key) >= 0
+}
+
 // S: reverse whichever order the listing is in, the capital-is-the-variant pair g/G and j/J use.
 // The order on screen is turned around whether or not this surface heads it with a column, because
 // the backend produces it either way and the reversal is of what the user can see.
