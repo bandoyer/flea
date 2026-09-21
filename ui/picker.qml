@@ -484,56 +484,12 @@ ShellRoot {
                 onAccepted: win.accept()
             }
 
-            // The footer: what is checked on the left, the keys that act on it on the right.
-            Item {
+            Flea.PickerFooter {
                 id: status
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: Theme.chromeHeight
-
-                // The footer takes the chrome plane, the same strip the ask above it stands on.
-                Rectangle {
-                    anchors.fill: parent
-                    color: Theme.color.surface
-                }
-
-                Rectangle {
-                    anchors.top: parent.top
-                    width: parent.width
-                    height: Theme.spacing.hairline
-                    color: win.edge
-                }
-
-                Text {
-                    id: statusMessage
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacing.rowPaddingX
-                    anchors.right: statusHints.left
-                    anchors.rightMargin: Theme.spacing.gap
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: win.message.length > 0 ? win.message : Picker.statusLine(win.marks.length, Picker.totalBytes(win.marks))
-                    color: win.messageError ? Theme.color.error : Theme.color.foreground
-                    font.family: Theme.font.family
-                    font.pixelSize: Theme.font.caption
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                }
-
-                Text {
-                    id: statusHints
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacing.rowPaddingX
-                    width: Math.min(implicitWidth, Math.max(0, parent.width - 2 * Theme.spacing.rowPaddingX
-                        - Theme.spacing.gap - Math.min(statusMessage.implicitWidth, parent.width / 2)))
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: win.backendUnavailable ? "Esc cancel" : Picker.hints(win.req)
-                    color: Theme.color.foreground
-                    font.family: Theme.font.family
-                    font.pixelSize: Theme.font.caption
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                }
+                picker: win
             }
 
             Loader {
@@ -598,7 +554,7 @@ ShellRoot {
                     marks: win.marks, state: win.listingState, filter: win.filterIndex, history: win.history,
                     marksBusy: win.markRequest > 0, saveBusy: win.saveRequest > 0, submitting: win.submitting, backendUnavailable: win.backendUnavailable,
                     canAccept: win.canAccept, saveReady: win.saveReady, collision: win.saveCollision,
-                    saveName: win.saveName, saveError: win.saveError, message: win.message, messageError: win.messageError, hints: statusHints.text,
+                    saveName: win.saveName, saveError: win.saveError, message: win.message, messageError: win.messageError, hints: status.hints,
                     controls: chrome.controls().concat(save.controls(), places.controls()), listFocus: list.activeFocus,
                     railFocus: places.focusItem.activeFocus, preset: Flea.ViewState.keysPreset,
                     bodySmall: Theme.font.bodySmall, body: Theme.font.body, width: win.width, height: win.height,
