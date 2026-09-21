@@ -33,6 +33,10 @@ Item {
         onSortRequested: function (key) { root.list.forceActiveFocus(); root.list.sortColumn(key) }
     }
 
+    // What the header is actually marking, which is not always the order the backend recorded:
+    // Recent is a listpaths listing that leaves that value standing, and draws no mark over it.
+    function mark() { return header.sortBy }
+
     // The sortable titles as controls, for a harness that has to click a real header centre. Mode
     // and Kind head no sort here, and a title the width has dropped reports itself invisible rather
     // than going missing, so a case can assert a narrow layout offers no pointer route at all.

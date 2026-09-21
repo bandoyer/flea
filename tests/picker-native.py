@@ -625,7 +625,7 @@ def test_sorting():
     recent.click("Recent")
     recent.until("Recent opened", lambda state: state["path"] == "flea:recent")
     state = recent.state()
-    check("SP11 Recent draws no order mark", state["sortBy"] == "", state["sortBy"])
+    check("SP11 Recent draws no order mark", state["headerSort"] == "", [state["headerSort"], state["sortBy"]])
     check("SP11 Recent disables every sort header",
           not any(item["enabled"] for item in state["controls"] if item["name"].startswith("Sort by")),
           [item for item in state["controls"] if item["name"].startswith("Sort by")])
@@ -652,7 +652,7 @@ def test_sorting():
     state = big.until("a sort after scrolling returns to the first row", lambda state: state["held"] == 0 and state["cursor"] == 0)
     check("SP11 the first row is the first of the new order",
           [row["n"] for row in state["rows"][:2]] == ["file-000.txt", "file-001.txt"], [row["n"] for row in state["rows"][:2]])
-    check("SP11 and the largest file is last in an ascending size order", state["total"] == 151, state["total"])
+    check("SP11 and the whole listing is still counted after the reorder", state["total"] == 151, state["total"])
     big.capture("large-resorted")
     big.cancel()
 

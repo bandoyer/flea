@@ -598,7 +598,7 @@ ShellRoot {
                     marks: win.marks, state: win.listingState, filter: win.filterIndex, history: win.history,
                     marksBusy: win.markRequest > 0, saveBusy: win.saveRequest > 0, submitting: win.submitting, backendUnavailable: win.backendUnavailable,
                     canAccept: win.canAccept, saveReady: win.saveReady, collision: win.saveCollision,
-                    saveName: win.saveName, saveError: win.saveError, message: win.message, messageError: win.messageError, hints: status.hint, sortBy: backend.sortBy, sortDesc: backend.sortDesc,
+                    saveName: win.saveName, saveError: win.saveError, message: win.message, messageError: win.messageError, hints: status.hint, sortBy: backend.sortBy, sortDesc: backend.sortDesc, headerSort: header.mark(),
                     controls: chrome.controls().concat(save.controls(), places.controls(), header.controls(win)), listFocus: list.activeFocus,
                     railFocus: places.focusItem.activeFocus, preset: Flea.ViewState.keysPreset,
                     bodySmall: Theme.font.bodySmall, body: Theme.font.body, width: win.width, height: win.height,
