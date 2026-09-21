@@ -9,8 +9,14 @@ Item {
     property string sortBy: "name"
     property bool sortDesc: false
     property bool dualMode: false
+    // What stands ahead of the name before the title does, which is the chooser's check box; the
+    // window heads its rows with nothing, so this is 0 there. Same slot as ui/Row.qml's own.
+    property real leadingSlot: 0
+    // The chooser's date is the 80px slot SendPicker.html draws, not the window's sixteen characters.
+    property bool compactDate: false
     readonly property real sizeWidth: root.dualMode ? Theme.dualColumn.size : Theme.column.size
-    readonly property real dateWidth: root.dualMode ? Theme.dualColumn.date : Theme.column.date
+    readonly property real dateWidth: root.dualMode ? Theme.dualColumn.date
+        : root.compactDate ? Theme.column.pickerDate : Theme.column.date
 
     // The click ui/js/Sort.js answers. The header owns no sort state, so it only says which column
     // was hit; the key is the protocol's own, which is why Modified sends "mtime".
@@ -39,7 +45,7 @@ Item {
     // ui/Row.qml resolves its own from a width anchoring keeps
     // equal to this one, so the header can never head a column no row below it is drawing.
     property var hiddenCols: ViewState.hiddenCols
-    readonly property var cols: root.dualMode ? Theme.dualColumns(root.width, root.hiddenCols) : Theme.columns(root.width, root.hiddenCols)
+    readonly property var cols: root.dualMode ? Theme.dualColumns(root.width, root.hiddenCols) : Theme.columns(root.width, root.hiddenCols, root.dateWidth)
 
     implicitHeight: Theme.chromeHeight
 
@@ -64,7 +70,7 @@ Item {
     PanelSectionHeader {
         id: headerName
         anchors.left: parent.left
-        anchors.leftMargin: Theme.spacing.rowPaddingX + (root.dualMode ? Theme.markSize + Theme.spacing.gap : 0)
+        anchors.leftMargin: Theme.spacing.rowPaddingX + root.leadingSlot + (root.dualMode ? Theme.markSize + Theme.spacing.gap : 0)
         anchors.right: headerMode.left
         anchors.rightMargin: root.cols.mode ? Theme.spacing.gap : 0
         anchors.verticalCenter: parent.verticalCenter
@@ -154,7 +160,7 @@ Item {
     }
 
     // What the header is drawing right now, for the seam that reads it beside a row's.
-    function columnSet() { return root.dualMode ? ["name"].concat(root.cols.size ? ["size"] : []).concat(root.cols.date ? ["date"] : []).join(",") : Theme.columnNames(root.width, root.hiddenCols) }
+    function columnSet() { return root.dualMode ? ["name"].concat(root.cols.size ? ["size"] : []).concat(root.cols.date ? ["date"] : []).join(",") : Theme.columnNames(root.width, root.hiddenCols, root.dateWidth) }
 
     // The one lookup the geometry reader needs, the same by-key idiom Pane.itemFor uses for rows.
     function cell(key) {

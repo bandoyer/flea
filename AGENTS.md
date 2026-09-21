@@ -800,6 +800,22 @@ gets the same chooser.
   `ui/PickerList.qml` hands `Row` `Picker.HIDDEN_COLS` and the chooser never inherits Mode or Kind
   from `ViewState`, whatever the header menu has switched on for the browser window.
 
+**The chooser sorts through the same `sort` command the window does, and nothing else.**
+`ui/PickerHeader.qml` is the window's own `ui/Header.qml` over `Picker.HIDDEN_COLS`, given the check
+box's leading slot and the 80px date so its titles stand over the cells `ui/PickerList.qml` draws.
+Its click and the `s`/`S` keys, which already resolve in the `listing` context, all reach
+`ui/js/Sort.js`'s decision functions over `Picker.SORT_ORDERS` and land in `picker.requestSort`,
+which records the order and sends `{"c":"sort"}` followed by a `window`. It is `sort` and not a
+re-`list` on purpose: `filter_listing` runs before ordering in `src/backend/run.rs`, so the listing
+being reordered is already narrowed to the caller's filter, and `Request::Sort` moves neither
+`st.base` nor the watch. That is what lets the checked paths, the Save name and its collision answer
+all stand: the directory did not change, so nothing invalidates them and `requestSort` touches none
+of them. `SORT_ORDERS` omits `kind` because there is no Kind column to carry its arrow; a `kind`
+order inherited from `ui.json` still opens and still reverses under `S`, and `s` steps off it. The
+choice pins `Backend.preserveSort`, so it outlives a filter change, the hidden toggle, navigation
+and a watched refresh, and it is never written back to `ui.json`. Recent is `listpaths`, which is
+never sorted, so `ui/PickerHeader.qml` goes down whole there.
+
 **Recent, and why it is read-only.** `SendPicker.html` draws a Recent row above Home in the rail,
 says the location's own name where the path would be, and draws Parent disabled with the words
 "unavailable in Recent". The history it lists is the desktop's own,

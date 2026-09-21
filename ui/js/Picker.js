@@ -26,6 +26,11 @@ function isRecent(location) {
 // the window's rows also carry are hidden here at every width rather than at some of them.
 var HIDDEN_COLS = ["mode", "kind"]
 
+// The orders the chooser's own header can mark, which is the same reason HIDDEN_COLS exists: with
+// no Kind column to carry an arrow, kind would be an order the window sorts in and cannot report.
+// ui/js/Sort.js walks this list for s; S still turns around a kind order inherited from ui.json.
+var SORT_ORDERS = ["name", "size", "mtime"]
+
 // Every field defaulted, because a request that arrived short must still open a window.
 function request(text) {
     var read = {}

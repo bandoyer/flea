@@ -3,6 +3,7 @@ import qs.Commons
 import "." as Flea
 import "js/Match.js" as Match
 import "js/Picker.js" as Picker
+import "js/Sort.js" as Sort
 import "js/Keymap.js" as Keymap
 
 // The picker's listing: ui/Row.qml drawn behind a check box, and the keys that move through it. The
@@ -138,6 +139,19 @@ ListView {
         root.positionViewAtIndex(to, ListView.Contain)
     }
 
+    // The header's click and the s and S keys, all three through ui/js/Sort.js over the three orders
+    // this chooser heads a column with. The decision lands in ui/picker.qml, which owns the listing
+    // state a reorder disturbs; nothing here reaches into it.
+    function sortColumn(key) {
+        root.sortTo(Sort.clicked(Picker.SORT_ORDERS, root.backend.sortBy, root.backend.sortDesc, key))
+    }
+    function sortStep() { root.sortTo(Sort.stepped(Picker.SORT_ORDERS, root.backend.sortBy)) }
+    function sortFlip() { root.sortTo(Sort.flipped(root.backend.sortBy, root.backend.sortDesc)) }
+    function sortTo(decision) {
+        if (decision)
+            root.picker.requestSort(decision.key, decision.desc)
+    }
+
     Keys.onPressed: function (event) {
         var action = Keymap.lookup(event.key, event.text, event.modifiers, "listing")
         event.accepted = true
@@ -169,6 +183,10 @@ ListView {
             root.picker.goUp()
         } else if (action === "historyBack") {
             root.picker.goBack()
+        } else if (action === "sortNext") {
+            root.sortStep()
+        } else if (action === "sortReverse") {
+            root.sortFlip()
         } else if (action === "toggleHidden") {
             root.showHidden = !root.showHidden
             if (root.picker.path.length > 0)

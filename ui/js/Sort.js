@@ -13,26 +13,52 @@
 // refuses every other key by name, and the backend is the one that says so, see ui/js/Errors.js.
 var ORDERS = ["name", "size", "mtime", "kind"]
 
+// What a click, s and S decide, read from the order the listing is in and the orders the surface in
+// front of the user actually offers. The decision is returned rather than carried out, because the
+// two surfaces offer different columns and keep different things when one lands: a pane drops every
+// cache keyed by a row index, and the chooser, whose marks are paths, drops none of them. Each
+// answers {key, desc}, or null where there is nothing to ask the backend for.
+
 // ui/Header.qml's click. The column already sorted reverses; any other column starts ascending,
-// which is the order the canvas's own header draws beside "Name". Only ORDERS may leave this file.
-function column(pane, key) {
-    // Unsupported columns remain labels rather than sending a sort the backend must refuse.
-    if (ORDERS.indexOf(key) < 0)
-        return
-    resort(pane, key, pane.backend.sortBy === key ? !pane.backend.sortDesc : false)
+// which is the order the canvas's own header draws beside "Name".
+function clicked(orders, by, desc, key) {
+    // A column this surface does not offer stays a label rather than sending a sort to be refused.
+    if (orders.indexOf(key) < 0)
+        return null
+    return {key: key, desc: by === key ? !desc : false}
 }
 
-// s: the next order the backend can produce, always ascending, because the column and the direction
-// are separate choices. It walks ORDERS, so it never lands on a column that would only earn a
-// refusal; an aimed click on one of those earns the reason, a key that walks onto it earns noise.
-function next(pane) {
-    var at = ORDERS.indexOf(pane.backend.sortBy)
-    resort(pane, ORDERS[(at + 1) % ORDERS.length], false)
+// s: the next order in the list, always ascending, because the column and the direction are
+// separate choices. An order the list does not hold wraps to the first, so an order recorded by
+// something this surface cannot draw, such as a chooser opened on the window's saved kind, can
+// never wedge the key.
+function stepped(orders, by) {
+    return {key: orders[(orders.indexOf(by) + 1) % orders.length], desc: false}
 }
 
 // S: reverse whichever order the listing is in, the capital-is-the-variant pair g/G and j/J use.
+// The order on screen is turned around whether or not this surface heads it with a column, because
+// the backend produces it either way and the reversal is of what the user can see.
+function flipped(by, desc) {
+    return {key: by, desc: !desc}
+}
+
+// ui/Pane.qml's three, over every order the backend can produce. Only ORDERS may leave this file.
+function column(pane, key) {
+    apply(pane, clicked(ORDERS, pane.backend.sortBy, pane.backend.sortDesc, key))
+}
+
+function next(pane) {
+    apply(pane, stepped(ORDERS, pane.backend.sortBy))
+}
+
 function reverse(pane) {
-    resort(pane, pane.backend.sortBy, !pane.backend.sortDesc)
+    apply(pane, flipped(pane.backend.sortBy, pane.backend.sortDesc))
+}
+
+function apply(pane, decision) {
+    if (decision)
+        resort(pane, decision.key, decision.desc)
 }
 
 // The request goes out for every key, so the refusal is the backend's alone. Only an order it will

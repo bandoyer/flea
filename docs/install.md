@@ -255,6 +255,14 @@ what is marked, Backspace climbs, Escape refuses. `.` shows and hides the direct
 same re-read the window makes; a preset's toggleHidden chord does the same. Nothing marked and Enter
 does nothing, because a chooser that sends on a stray keypress is worse than one that asks twice.
 
+The listing carries the window's column header too, over the three columns a chooser draws. Clicking
+Name, Size or Modified sorts by it, ascending first; clicking the one already sorted turns it around.
+`s` steps through the three and `S` reverses whichever is up, the same pair the window uses. A narrow
+dialog drops the Size and Modified columns, as the window's rows do, and the keys still sort. The
+order is the dialog's own: it survives walking into a folder and back, the hidden-file toggle and a
+filter change, it is forgotten when the dialog closes, and it never writes your window's own sort
+preference. Recent is not sorted at all, because it is the desktop's history in its own order.
+
 ### Undo
 
 ```

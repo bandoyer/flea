@@ -110,12 +110,7 @@ ShellRoot {
             if (win.backendUnavailable) return
             if (shares.item) shares.item.close()
             win.path = next
-            win.total = 0
-            win.held = 0
-            win.rows = []
-            win.cursorIndex = 0
-            win.listingState = "loading"
-            win.receivingLatestListing = false
+            win.forgetListing()
             win.invalidateSave()
             win.validateMarks(false)
             if (Picker.isRecent(next)) {
@@ -125,6 +120,18 @@ ShellRoot {
             win.requestListing(backend.listRequest(next, win.windowSize, list.showHidden))
         }
 
+        // What the window forgets when the rows it holds are about to be replaced, by another
+        // directory or by this one reordered: each is named by a row index, so each would
+        // otherwise go on describing a file it no longer names.
+        function forgetListing() {
+            win.total = 0
+            win.held = 0
+            win.rows = []
+            win.cursorIndex = 0
+            win.listingState = "loading"
+            win.receivingLatestListing = false
+        }
+
         function requestListing(request) {
             win.pendingListings++
             backend.send(Object.assign(request, win.filterRequest()))
@@ -132,6 +139,29 @@ ShellRoot {
 
         function filterRequest() {
             return {pickerGlobs: win.filter ? win.filter.globs : [], pickerMimes: win.filter ? win.filter.mimes : []}
+        }
+
+        // A header click or s/S. The listing is reordered where it stands, by the same backend
+        // command ui/js/Sort.js sends from the window: the directory has not changed, so the checked
+        // paths, the Save name and its collision answer all still describe the folder they were
+        // taken in, and none of them is touched here.
+        function requestSort(key, desc) {
+            if (win.backendUnavailable || win.recent || win.submitting || win.listingState === "loading")
+                return
+            // The order already shown would cost a round trip to redraw the rows already up.
+            if (backend.sortBy === key && backend.sortDesc === desc)
+                return
+            // Only a choice of the user's own pins the order; until then ui/Backend.qml's resetSort
+            // still seeds every listing from the saved preference.
+            backend.preserveSort = true
+            backend.sortBy = key
+            backend.sortDesc = desc
+            win.forgetListing()
+            win.pendingListings++
+            backend.sort(key, desc)
+            // sort answers a listed line and no rows of its own, so the reordered window is asked
+            // for here, after it; see docs/protocol.md "sort".
+            backend.window(0, win.windowSize)
         }
 
         function check(request) {
@@ -421,11 +451,21 @@ ShellRoot {
                 }
             }
 
+            Flea.PickerHeader {
+                id: header
+                anchors.left: places.right
+                anchors.right: parent.right
+                anchors.top: chrome.bottom
+                picker: win
+                backend: backend
+                list: list
+            }
+
             Flea.PickerList {
                 id: list
                 anchors.left: places.right
                 anchors.right: parent.right
-                anchors.top: chrome.bottom
+                anchors.top: header.bottom
                 anchors.bottom: save.top
                 picker: win
                 backend: backend
@@ -478,7 +518,7 @@ ShellRoot {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: status.top
-                maximumHeight: Math.max(0, status.y - chrome.height - Theme.rowHeight)
+                maximumHeight: Math.max(0, status.y - chrome.height - header.height - Theme.rowHeight)
                 picker: win
                 onNameEdited: function (text) { win.saveName = text }
                 onAccepted: win.accept()
@@ -549,7 +589,7 @@ ShellRoot {
             function message(): string { return win.message }
             function checks(): string { return JSON.stringify({marksBusy: win.markRequest > 0, saveBusy: win.saveRequest > 0, submitting: win.submitting, canAccept: win.canAccept, saveReady: win.saveReady, collision: win.saveCollision, review: win.saveReview.review || 0}) }
             function markedUris(): string { return JSON.stringify(win.marks.map(function(mark) { return mark.uri })) }
-            function controls(): string { return JSON.stringify(chrome.controls().concat(save.controls(), places.controls())) }
+            function controls(): string { return JSON.stringify(chrome.controls().concat(save.controls(), places.controls(), header.controls(win))) }
             function rowCentre(index: int): string { return win.centre(list.itemAtIndex(index)) }
             function saveState(): string { return JSON.stringify({name: win.saveName, path: win.saveReview.path || "", collision: win.saveCollision, error: win.saveError, field: win.centre(save.fieldItem)}) }
             function snapshot(): string {
@@ -558,8 +598,8 @@ ShellRoot {
                     marks: win.marks, state: win.listingState, filter: win.filterIndex, history: win.history,
                     marksBusy: win.markRequest > 0, saveBusy: win.saveRequest > 0, submitting: win.submitting, backendUnavailable: win.backendUnavailable,
                     canAccept: win.canAccept, saveReady: win.saveReady, collision: win.saveCollision,
-                    saveName: win.saveName, saveError: win.saveError, message: win.message, messageError: win.messageError, hints: status.hint,
-                    controls: chrome.controls().concat(save.controls(), places.controls()), listFocus: list.activeFocus,
+                    saveName: win.saveName, saveError: win.saveError, message: win.message, messageError: win.messageError, hints: status.hint, sortBy: backend.sortBy, sortDesc: backend.sortDesc,
+                    controls: chrome.controls().concat(save.controls(), places.controls(), header.controls(win)), listFocus: list.activeFocus,
                     railFocus: places.focusItem.activeFocus, preset: Flea.ViewState.keysPreset,
                     bodySmall: Theme.font.bodySmall, body: Theme.font.body, width: win.width, height: win.height,
                     geometry: {chrome: chrome.height, rail: places.width, row: Theme.rowHeight, footer: status.height,

@@ -1,4 +1,5 @@
 .import "../../ui/js/Picker.js" as Picker
+.import "../../ui/js/Sort.js" as Sort
 
 function run(check) {
     // The shape tools/flea-portal writes for an OpenFile with two filters, taken from its request_for().
@@ -99,6 +100,38 @@ function run(check) {
     check("a picked path leaves as a file URI", Picker.uris(["/home/gm/a.txt"])[0], "file:///home/gm/a.txt")
     check("a space is encoded, because GLib refuses a bad one", Picker.uris(["/home/gm/my file.txt"])[0], "file:///home/gm/my%20file.txt")
     check("a hash is encoded rather than read as a fragment", Picker.uris(["/home/gm/a#b.txt"])[0], "file:///home/gm/a%23b.txt")
+
+    // The chooser offers Name, Size and Modified and no others: ui/js/Picker.js hides the Mode and
+    // Kind columns, and an order with no column to mark it is an order the window cannot report.
+    // ui/js/Sort.js decides; the routes in ui/PickerList.qml and ui/picker.qml carry it out.
+    var offered = Picker.SORT_ORDERS
+    check("the chooser offers exactly the three columns it draws", offered.join(","), "name,size,mtime")
+
+    check("a click on another column starts it ascending",
+          JSON.stringify(Sort.clicked(offered, "name", false, "size")), '{"key":"size","desc":false}')
+    check("a click on another column starts ascending whatever direction the last one was in",
+          JSON.stringify(Sort.clicked(offered, "name", true, "size")), '{"key":"size","desc":false}')
+    check("a click on the sorted column reverses it",
+          JSON.stringify(Sort.clicked(offered, "size", false, "size")), '{"key":"size","desc":true}')
+    check("and a second click returns it to ascending",
+          JSON.stringify(Sort.clicked(offered, "size", true, "size")), '{"key":"size","desc":false}')
+    // Mode and Kind head no column here, so a click aimed at one decides nothing at all.
+    check("a column the chooser does not offer decides nothing", Sort.clicked(offered, "name", false, "kind"), null)
+    check("and neither does a key the backend would refuse", Sort.clicked(offered, "name", false, "mode"), null)
+
+    check("s steps from name to size", JSON.stringify(Sort.stepped(offered, "name")), '{"key":"size","desc":false}')
+    check("s steps from size to mtime", JSON.stringify(Sort.stepped(offered, "size")), '{"key":"mtime","desc":false}')
+    check("s wraps from mtime back to name", JSON.stringify(Sort.stepped(offered, "mtime")), '{"key":"name","desc":false}')
+    // The window can leave kind in ui.json, and the chooser reads that preference on its first
+    // listing. s must step off it rather than wedge on an order it has no column to draw.
+    check("s from an inherited kind lands on name", JSON.stringify(Sort.stepped(offered, "kind")), '{"key":"name","desc":false}')
+    check("s always starts a new column ascending", Sort.stepped(offered, "mtime").desc, false)
+
+    check("S reverses the order the listing is in", JSON.stringify(Sort.flipped("size", false)), '{"key":"size","desc":true}')
+    check("S turns a reversed order back", JSON.stringify(Sort.flipped("size", true)), '{"key":"size","desc":false}')
+    // S asks for the reverse of what is shown, and an inherited kind is shown even without an arrow.
+    check("S reverses an inherited kind rather than refusing it",
+          JSON.stringify(Sort.flipped("kind", false)), '{"key":"kind","desc":true}')
 
     check("a pick answers with its URIs", Picker.reply(0, ["/home/gm/a.txt"]),
           '{"response":0,"uris":["file:///home/gm/a.txt"]}')

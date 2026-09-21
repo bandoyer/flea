@@ -547,10 +547,137 @@ def test_keys():
         small.cancel()
 
 
+# Three orders that disagree with each other at every position but the folder's, so a listing left
+# in the wrong one cannot pass by accident. bravo.md ties charlie.txt on size, which the backend
+# breaks by name and reverses whole when the order is reversed; see src/backend/metasort.rs.
+SORTED_BY_NAME = ["folder", "alpha.log", "bravo.md", "charlie.txt", "delta.txt"]
+SORTED_BY_SIZE = ["folder", "bravo.md", "charlie.txt", "alpha.log", "delta.txt"]
+SORTED_BY_DATE = ["folder", "charlie.txt", "bravo.md", "delta.txt", "alpha.log"]
+
+
+def order(state):
+    return [row["n"] for row in state["rows"]]
+
+
+def reverse_of(names):
+    # foldersFirst survives a reversal, so only the files turn around.
+    return [names[0]] + list(reversed(names[1:]))
+
+
+def test_sorting():
+    write(state_file, json.dumps({"sort": {"key": "name"}}))
+    untouched = state_file.read_bytes()
+    sorting = Request("SP11-sorting", folder=sortfix).opened()
+    sorting.until("opens in the saved name order", lambda state: order(state) == SORTED_BY_NAME)
+
+    sorting.click("Sort by Size")
+    state = sorting.until("a Size click sorts by size", lambda state: order(state) == SORTED_BY_SIZE)
+    check("SP11 the click records the order it asked for", [state["sortBy"], state["sortDesc"]] == ["size", False], state["sortBy"])
+    check("SP11 a size tie breaks by name", order(state)[1:3] == ["bravo.md", "charlie.txt"], order(state))
+
+    sorting.click("Sort by Size")
+    state = sorting.until("a second Size click reverses it", lambda state: order(state) == reverse_of(SORTED_BY_SIZE))
+    check("SP11 the reversal is recorded", [state["sortBy"], state["sortDesc"]] == ["size", True], state["sortBy"])
+    check("SP11 a reversed order reverses the tie too", order(state)[3:] == ["charlie.txt", "bravo.md"], order(state))
+
+    sorting.click("Sort by Modified")
+    state = sorting.until("a Modified click starts ascending, not reversed", lambda state: order(state) == SORTED_BY_DATE)
+    check("SP11 Modified is recorded as the protocol's own mtime", [state["sortBy"], state["sortDesc"]] == ["mtime", False], state["sortBy"])
+    sorting.capture("sorted-by-date")
+
+    # s walks the three columns the chooser heads and wraps; S turns whichever one it lands on around.
+    sorting.key("s")
+    sorting.until("s steps from mtime back to name", lambda state: order(state) == SORTED_BY_NAME)
+    sorting.key("s")
+    sorting.until("s steps on to size", lambda state: order(state) == SORTED_BY_SIZE)
+    sorting.key("S")
+    sorting.until("S reverses the order s left", lambda state: order(state) == reverse_of(SORTED_BY_SIZE))
+
+    # A reorder is not a new directory: what is checked was checked by path and stays checked.
+    sorting.key("s")
+    sorting.until("s returns to mtime", lambda state: order(state) == SORTED_BY_DATE)
+    sorting.mark("delta.txt")
+    sorting.click("Sort by Name")
+    state = sorting.until("a sort under a checked file keeps the listing moving", lambda state: order(state) == SORTED_BY_NAME)
+    check("SP11 the checked path survives the reorder",
+          [mark["path"] for mark in state["marks"]] == [str(sortfix / "delta.txt")], state["marks"])
+    check("SP11 the cursor returns to the first row", [state["cursor"], state["held"]] == [0, 0], state["geometry"])
+
+    # The order is the dialog's own and outlives everything that re-reads the directory.
+    sorting.key(".")
+    sorting.click("Sort by Size")
+    sorting.until("a sort after a hidden-file reload holds", lambda state: order(state) == SORTED_BY_SIZE)
+    sorting.key(".")
+    sorting.until("and the reload back holds it too", lambda state: order(state) == SORTED_BY_SIZE)
+    sorting.row("folder")
+    sorting.key("-k", "Return")
+    sorting.until("navigated into the folder", lambda state: state["path"] == str(sortfix / "folder"))
+    sorting.click("Back")
+    state = sorting.until("Back restores the chosen order", lambda state: order(state) == SORTED_BY_SIZE)
+    check("SP11 Back keeps the checked path as well", len(state["marks"]) == 1, state["marks"])
+    check("SP11 sorting writes no preference", state_file.read_bytes() == untouched, state_file.read_text())
+    sorting.row("alpha.log")
+    sorting.key("-k", "Return")
+    sorting.answered(0, [(sortfix / "delta.txt").as_uri()])
+
+    # Recent is the desktop's own history order, so the headers go down with it.
+    recent = Request("SP11-recent", folder=sortfix).opened()
+    recent.click("Recent")
+    recent.until("Recent opened", lambda state: state["path"] == "flea:recent")
+    state = recent.state()
+    check("SP11 Recent draws no order mark", state["sortBy"] == "", state["sortBy"])
+    check("SP11 Recent disables every sort header",
+          not any(item["enabled"] for item in state["controls"] if item["name"].startswith("Sort by")),
+          [item for item in state["controls"] if item["name"].startswith("Sort by")])
+    recent.capture("recent-unsorted")
+    recent.cancel()
+
+    # A window sorted by kind leaves that in ui.json, and the chooser has no Kind column to mark it
+    # with. It still opens in that order; s steps off it and S turns it around.
+    write(state_file, json.dumps({"sort": {"key": "kind"}}))
+    inherited = Request("SP11-inherited", folder=sortfix).opened()
+    inherited.until("opens in the inherited kind order", lambda state: state["sortBy"] == "kind" and bool(state["rows"]))
+    inherited.key("S")
+    inherited.until("S reverses an inherited kind rather than refusing it", lambda state: state["sortBy"] == "kind" and state["sortDesc"])
+    inherited.key("s")
+    inherited.until("s steps off kind onto name", lambda state: order(state) == SORTED_BY_NAME)
+    inherited.cancel()
+
+    # A sort after scrolling a listing taller than the viewport comes back to the top.
+    write(state_file, json.dumps({"sort": {"key": "name"}}))
+    big = Request("SP11-large", folder=large).opened()
+    big.key("-k", "End")
+    big.until("scrolled to the end of a listing wider than one window", lambda state: state["held"] > 0)
+    big.click("Sort by Size")
+    state = big.until("a sort after scrolling returns to the first row", lambda state: state["held"] == 0 and state["cursor"] == 0)
+    check("SP11 the first row is the first of the new order",
+          [row["n"] for row in state["rows"][:2]] == ["file-000.txt", "file-001.txt"], [row["n"] for row in state["rows"][:2]])
+    check("SP11 and the largest file is last in an ascending size order", state["total"] == 151, state["total"])
+    big.capture("large-resorted")
+    big.cancel()
+
+    # Save keeps its name and its collision answer, because the folder did not change; and s and S
+    # typed into the field are two characters, not two sorts.
+    saving = Request("SP11-save", "SaveFile", folder=sortfix, current_name=GLib.Variant("s", "delta.txt")).opened()
+    saving.until("collision review ready", lambda state: state["saveReady"] and state["collision"])
+    saving.click("Sort by Size")
+    state = saving.until("the listing reorders under the save field", lambda state: order(state) == SORTED_BY_SIZE)
+    check("SP11 the Save name survives a sort", state["saveName"] == "delta.txt", state["saveName"])
+    check("SP11 the collision answer survives a sort", state["saveReady"] and state["collision"], state)
+    saving.focus_control("Filename")
+    saving.key("s")
+    saving.key("S")
+    state = saving.until("typing in the field types", lambda state: state["saveName"] == "delta.txtsS")
+    check("SP11 typing s and S never sorted", order(state) == SORTED_BY_SIZE, order(state))
+    saving.capture("save-sorted")
+    saving.cancel()
+
+
 def main():
     groups = {"single": test_single, "multiple": test_multiple, "directory": test_directory,
               "filters": test_filters, "changed": test_changed, "save": test_save,
-              "cancel": test_cancel, "failure": test_failure, "keys": test_keys}
+              "cancel": test_cancel, "failure": test_failure, "keys": test_keys,
+              "sorting": test_sorting}
     selected = sys.argv[1:] or list(groups)
     for name in selected:
         if name not in groups:
@@ -607,12 +734,18 @@ try:
         guard(root / name).mkdir(mode=0o700)
         picker_env[key] = str(root / name)
     picker_env.update(FLEA_BIN=str(BIN), FLEA_UI=str(UI), WAYLAND_DISPLAY=str(Path(drive_env["XDG_RUNTIME_DIR"]) / drive_env["WAYLAND_DISPLAY"]))
-    fixture, large = root / "files", root / "large"
-    for directory in [fixture, fixture / "folder", large, root / "portals", root / "state/flea"]:
+    fixture, large, sortfix = root / "files", root / "large", root / "sorting"
+    for directory in [fixture, fixture / "folder", large, sortfix, sortfix / "folder", root / "portals", root / "state/flea"]:
         guard(directory).mkdir(parents=True, exist_ok=True)
     write(fixture / "alpha.txt", "one")
     write(fixture / "beta.txt", "four")
     for index in range(150): write(large / f"file-{index:03}.txt", "text")
+    # Sizes and dates chosen so name, size and modified each give a different sequence, and so that
+    # bravo.md ties charlie.txt on size; see SORTED_BY_NAME and its two neighbours above.
+    for name, size, day in [("alpha.log", 40, 4), ("bravo.md", 7, 2), ("charlie.txt", 7, 1), ("delta.txt", 100, 3)]:
+        write(sortfix / name, "x" * size)
+        stamp = time.mktime((2026, 1, day, 12, 0, 0, 0, 0, -1))
+        os.utime(sortfix / name, (stamp, stamp))
     write(large / "zz-last.png", "image")
     state_file = root / "state/flea/ui.json"
     write(root / "portals/flea.portal", "[portal]\nDBusName=org.freedesktop.impl.portal.desktop.flea\nInterfaces=org.freedesktop.impl.portal.FileChooser;\n")
